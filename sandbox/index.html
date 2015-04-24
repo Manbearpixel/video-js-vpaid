@@ -121,9 +121,6 @@
 	    <!-- <source src="../sandbox/exampleadvpaid2.swf" type='application/x-shockwave-flash' /> -->
 		<!-- <source src="http://vjs.zencdn.net/v/oceans.mp4" type='video/mp4'> -->
 	</video>
-	<div id="adslot">
-        </slot>
-    </div>
 </div>
 
 <div class="content-center vpaid-settings-wrap">
@@ -133,13 +130,12 @@
 		<br style="clear: both;"/>
 	</div>
 	<div class="vpaid-options">
-		<button class="option-button" onclick="setVPAID('http://player.kaltura.com/modules/AdSupport/tests/liverail.xml?random={utility.random}&timestamp={utility.timestamp}&referrer_url={utility.referrer_url}&referrer_host={utility.referrer_host}')">Set to LiveRail JS</button>
-		<button class="option-button" onclick="setVPAID('http://ad4.liverail.com/?LR_PUBLISHER_ID=1331&LR_SCHEMA=vast2-vpaid&LR_FORMAT=application/x-shockwave-flash')">Set to LiveRail SWF</button>
+		<button class="option-button" onclick="setVPAID('http://player.kaltura.com/modules/AdSupport/tests/liverail.xml?random={utility.random}&timestamp={utility.timestamp}&referrer_url={utility.referrer_url}&referrer_host={utility.referrer_host}')">Set to LiveRail</button>
 		<button class="option-button" onclick="setVPAID('http://shadowcdn-01.yumenetworks.com/ym/1B3uA91O2152/1349/levLYHWa/vpaid_u_as3.xml')">Set to YuMe</button>
-		<button class="option-button" onclick="setVPAID('http://search.spotxchange.com/vast/2.00/79391?VPAID=1&content_page_url=mypage&cb=1234&player_width=300&player_height=250&vid_duration=30&vid_url=VideoURL&vid_id=VideoID&vid_title=Title&vid_description=Description&content_type=video')">Set to SpotX</button>
-		<button class="option-button" onclick="setVPAID('http://ads.adaptv.advertising.com/a/h/E9QvelCUR9z4REQAtUGFPQ==?cb=123344&pet=preroll&pageUrl=test123.com&eov=eov')">Set to Adaptv</button>
+		<button class="option-button" onclick="setVPAID('http://vast.bp3864217.btrll.com/vast/3864217?n=[timestamp]')">Set to Brighttoll</button>
 	</div>
 	<button onclick="runVPAID()">Run</button>
+	<button class="option-button" onclick="toggleDebug()">Toggle AS Debug (<span id='toggleDebug'></span>)</button>
 	<div class="notes">
 		<p>Notes</p>
 		<ul>
@@ -150,6 +146,18 @@
 </div>
 
 <script>
+
+var vpaidDebug = false;
+setDebug();
+
+function setDebug() {
+	document.getElementById("toggleDebug").innerHTML = vpaidDebug;
+}
+
+function toggleDebug() {
+	vpaidDebug = !vpaidDebug;
+	setDebug();
+}
 
 function refreshPage() {
 	location.reload();
@@ -162,20 +170,18 @@ function setVPAID(vpaidURL) {
 function runVPAID() {
 	
 	console.log("Running VPAID with Ad URL: " + document.getElementById("vpaid_url").value);
-	var envVars = {
-        maxWrapperLevels : 5,
-        videoSlot        : document.getElementById('my-video'), // Required
-        slot             : document.getElementById('adslot')
-        // companionSlots   : []
-    };
+	
 	var options = {
 		// This is where the VPAID integrated VideoJS SWF file is located
 		// IT HAS TO BE a full path to work properly! No relative paths work here!
 		vpaidflash: {
-			swf: 'http://localhost:8000/dist/video-js.swf',
-			ready: function() { console.log("VPAIDFLASH ready"); },
-			onReady: function() { console.log("VPAIDFLASH onready"); },
-			environmentVars: envVars
+			swf			: 'http://localhost:8000/dist/video-js.swf',
+			ready		: function() { console.log("[js] VPAIDFLASH ready"); },
+			onReady		: function() { console.log("[js] VPAIDFLASH onready"); },
+			vpaidPath	: document.getElementById("vpaid_url").value,
+			flashVars	: {
+				debug	: vpaidDebug
+			}
 		},
 		vpaidjs: {
 			// Unsure what this is right now...
@@ -189,9 +195,9 @@ function runVPAID() {
 
 	var player = videojs('my-video', options).ready(function(){
 		
-		console.log("VideoJS ready");
-		console.log(this);
-		console.log(this.el_.firstChild);
+		console.log("[js] VideoJS ready");
+		// console.log(this);
+		// console.log(this.el_.firstChild);
 		
 		var swfObject = this.el_.firstChild;
 		if (document.getElementById("vpaid_url").value.length == 0) {

@@ -11,11 +11,9 @@ package com.videojs.vpaid {
 	import flash.external.ExternalInterface;
     import flash.system.LoaderContext;
     import com.videojs.vpaid.events.VPAIDEvent;
-    import flash.media.SoundMixer;
-    import flash.media.SoundTransform;    
-    import flash.utils.Timer;
-    import flash.events.TimerEvent;
-    
+	
+	import flash.utils.*;
+
     public class AdContainer extends Sprite {
         
         private var _model: VideoJSModel;
@@ -25,35 +23,24 @@ package com.videojs.vpaid {
         private var _isPaused:Boolean = true;
         private var _hasEnded:Boolean = false;
         private var _loadStarted:Boolean = false;
-
-        private var _muteTimer:Timer = new Timer(300);
-        private var _debug:Boolean = false;
-
+		
+		private var _debug:Boolean = false;
+		
+		private var _timeoutDelay:Number = 5000;
+		private var _intervalId:uint;
+		private var _adTimeout:Timer;
 
         public function AdContainer(){
             _model = VideoJSModel.getInstance();
-            _muteTimer.addEventListener(TimerEvent.TIMER, muteHandler);
         }
 		
-        private function muteHandler(evt:TimerEvent):void {
-            SoundMixer.soundTransform = new SoundTransform(0);
-            SoundMixer.stopAll();
-            console('muteHandler');
-        }
-
-        public function alwaysMuted(bool:Boolean):void {
-            if (bool) {
-                _muteTimer.start();
-            }
-        }
-
 		public function console(mixedVar:*):void {
-            if (_debug) {
-    			//ExternalInterface.call("console.info", "[ActionScript] [AdContainer]: ");
-    			//ExternalInterface.call("console.group");
-    			ExternalInterface.call("console.log", "[ActionScript] [AdContainer]: " + mixedVar);
-    			//ExternalInterface.call("console.groupEnd");
-            }
+			if (_debug) {
+				ExternalInterface.call("console.info", "[ActionScript] [AdContainer]");
+				ExternalInterface.call("console.group");
+				ExternalInterface.call("console.log", mixedVar);
+				ExternalInterface.call("console.groupEnd");
+			}
 		}
 		
 		public function testFunction():String {
@@ -131,29 +118,27 @@ package com.videojs.vpaid {
                 _isPaused = false;
                 _vpaidAd.resumeAd();
                 _model.broadcastEventExternally(ExternalEventName.ON_RESUME);
-                
             }
-        }
-
-        public function startAd(): void {
-            _vpaidAd.startAd();
         }
         
         private function onAdLoaded(): void {
             addChild(_vpaidAd);
-            _model.broadcastEventExternally(VPAIDEvent.AdLoaded);
-            SoundMixer.soundTransform = new SoundTransform(0);
+			console("ONADLOADED2");
+            _vpaidAd.startAd();
         }
 
         private function onAdStarted(): void {
-            //_model.broadcastEventExternally(ExternalEventName.ON_START)
-            _model.broadcastEventExternally(VPAIDEvent.AdStarted);
+			console("ONADSTARTED2");
+			clearTimeout();
+			
+            _model.broadcastEventExternally(ExternalEventName.ON_START)
+            _model.broadcastEventExternally(ExternalEventName.ON_VPAID_ADSTARTED);
             _isPlaying = true;
             _isPaused = false;
         }
         
         private function onAdError(): void {
-            _model.broadcastErrorEventExternally(VPAIDEvent.AdError);
+            _model.broadcastErrorEventExternally(ExternalErrorEventName.AD_CREATIVE_VPAID_ERROR);
             _vpaidAd.stopAd();
         }
         
@@ -162,18 +147,53 @@ package com.videojs.vpaid {
                 _isPlaying = false;
                 _hasEnded = true;
                 _vpaidAd = null;
-                _model.broadcastEventExternally(VPAIDEvent.AdStopped);
-                SoundMixer.soundTransform = new SoundTransform(0);
+                _model.broadcastEventExternally(ExternalEventName.ON_PLAYBACK_COMPLETE);
             }
-            
         }
-				
+		
+		public function abortAd(): void {
+			console("ABORTING AD");
+			
+			_model.broadcastErrorEventExternally(ExternalErrorEventName.AD_CREATIVE_VPAID_ERROR);
+            /*_model.broadcastErrorEventExternally(VPAIDEvent.AdError);*/
+            _vpaidAd.stopAd();
+		}
+		
+        public function setDebug(pValue):void {
+            _debug = pValue;
+        }
+		
+		/*
+			loadVPAIDXML
+			
+			param vpaidAdURL The URL to grab a VPAID Ad XML
+			param onComplete The function to call when complete
+			
+		*/
+		public function loadVPAIDXML(vpaidAdURL:String, onComplete:Function):* {
+			
+			console("requesting vpaid...");
+			console("url::" + vpaidAdURL);
+		
+			var request:URLRequest = new URLRequest(vpaidAdURL);
+			request.method = URLRequestMethod.GET;
+		
+			var variables:URLVariables = new URLVariables();
+			variables.name = "TouchVision";
+			request.data = variables;
+		
+			var loader:URLLoader = new URLLoader();
+			loader.addEventListener(Event.COMPLETE, onComplete);
+			loader.dataFormat = URLLoaderDataFormat.TEXT;
+			loader.load(request);
+		}
+		
 		public function findVPAIDSWF(xmlSrc:String):String {
 			
 			// create new XML from xmlSrc
 			/*var vpaidXML = new XML(event.target.data);*/
 			var vpaidXML = new XML(xmlSrc);
-		  
+		
 			console("ad title test::" + vpaidXML.Ad.InLine.AdTitle.toString());
 			console("ad vpaid version test::" + vpaidXML.attribute("version").toXMLString());
 		
@@ -193,13 +213,6 @@ package com.videojs.vpaid {
 					vpaidSWFURL = creative.Linear.MediaFiles[0].MediaFile.toString();
 				}*/
 			}
-
-
-            if (vpaidXML.Ad.InLine.Creatives.Creative.Linear.AdParameters != "") {
-               console("set adparameters");
-               _model.adParameters = vpaidXML.Ad.InLine.Creatives.Creative.Linear.AdParameters
-
-            }
 		
 			if (vpaidSWFURL != "") {
 				/*console("ad swf found::" + vpaidSWFURL);*/
@@ -216,15 +229,7 @@ package com.videojs.vpaid {
             _loadStarted = true;
             var loader:Loader = new Loader();
             var loaderContext:LoaderContext = new LoaderContext();
-            loader.contentLoaderInfo.addEventListener(Event.INIT, function(evt) {
-                    console("****** Load Ad Asset init: " + evt);
-                    //successfulCreativeLoad(evt);
-                });
-            loader.contentLoaderInfo.addEventListener(ErrorEvent.ERROR, function (evt) {
-                    console("******** Load Ad Asset Error: " + evt);
-                });
             loader.contentLoaderInfo.addEventListener(Event.COMPLETE, function(evt:Object): void {
-                console("****** Load Ad Asset Complete: " + evt);
                 successfulCreativeLoad(evt);
             });
             loader.contentLoaderInfo.addEventListener(SecurityErrorEvent.SECURITY_ERROR, 
@@ -236,10 +241,6 @@ package com.videojs.vpaid {
                     throw new Error(evt.text);
                 });
             loader.load(new URLRequest(_src), loaderContext);
-        }
-
-        public function setDebug(pValue):void {
-            _debug = pValue;
         }
         
         private function successfulCreativeLoad(evt: Object): void {
@@ -270,28 +271,17 @@ package com.videojs.vpaid {
 			
             _vpaidAd.addEventListener(VPAIDEvent.AdLog, function(data:*):void {
 				console("OnAdLog");
-                if (data) console(data);
+				/*console(data);*/
             });
             
             _vpaidAd.addEventListener(VPAIDEvent.AdStopped, function():void {
 				console("OnAdStoppped");
                 onAdStopped();
             });
-
-            _vpaidAd.addEventListener(VPAIDEvent.AdImpression, function(evt):void {
-                console("OnAdImpression: ");
-                console(evt);
-                _model.broadcastEventExternally(VPAIDEvent.AdImpression);
-            });
             
-            _vpaidAd.addEventListener(VPAIDEvent.AdError, function(evt):void {
-				console("OnVPAIDAdError: " + evt.data.message);
-                console(evt);
+            _vpaidAd.addEventListener(VPAIDEvent.AdError, function():void {
+				console("OnAdError");
                 onAdError();
-            });
-
-            _vpaidAd.addEventListener(VPAIDEvent.AdSkipped, function():void {
-                console("OnVPAIDAdSkipped: ");
             });
 
             _vpaidAd.addEventListener(VPAIDEvent.AdStarted, function():void {
@@ -299,17 +289,31 @@ package com.videojs.vpaid {
                 onAdStarted();
             });
 
-            _vpaidAd.addEventListener(VPAIDEvent.AdVideoComplete, function():void {
-                console("OnAdVideoComplete");
-                _model.broadcastEventExternally(VPAIDEvent.AdVideoComplete);
-            });
-
 			console("handshake");
             _vpaidAd.handshakeVersion("2.0");
 
 			console("initAd");
             // Use stage rect because current ad implementations do not currently provide width/height.
-            _vpaidAd.initAd(_model.stageRect.width, _model.stageRect.height, "normal", _model.bitrate, _model.adParameters, _model.environmentVars);
+            _vpaidAd.initAd(_model.stageRect.width, _model.stageRect.height, "normal", _model.bitrate, _model.adParameters);
+			
+			/*_intervalId = setTimeout(delayedFunction, _timeoutDelay);*/
+			_adTimeout = new Timer(_timeoutDelay);
+			_adTimeout.addEventListener("timer", delayedFunction);
+			
+			_adTimeout.start();
         }
+		
+		public function delayedFunction(event:TimerEvent): void {
+			console("Ad Wait Timeout! Ending Ad!");
+			clearTimeout();
+			abortAd();
+			/*console(_intervalId);*/
+		}
+		
+		public function clearTimeout(): void {
+			/*clearTimeout(_intervalId);*/
+			_adTimeout.stop();
+			console("Timeout cleared!");
+		}
     }
 }

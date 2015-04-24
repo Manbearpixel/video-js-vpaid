@@ -20,7 +20,6 @@ package{
     import flash.utils.ByteArray;
     import flash.utils.Timer;
     import flash.utils.setTimeout;
-
     
     [SWF(backgroundColor="#000000", frameRate="60", width="480", height="270")]
     public class VideoJS extends Sprite{
@@ -29,8 +28,7 @@ package{
         
         private var _app:VideoJSApp;
         private var _stageSizeTimer:Timer;
-        private var _debug:Boolean = false;
-        private var _vastResponse:String;
+		private var _debug:Boolean = false;
         
         public function VideoJS(){
             _stageSizeTimer = new Timer(250);
@@ -39,54 +37,76 @@ package{
         }
 		
 		public function console(mixedVar:*):void {
-            if (_debug) {
-			     ExternalInterface.call("console.info", "[ActionScript]");
-			     ExternalInterface.call("console.group");
-			     ExternalInterface.call("console.log", mixedVar);
-			     ExternalInterface.call("console.groupEnd");
-            }
+			if (_debug) {
+				ExternalInterface.call("console.info", "[ActionScript]");
+				ExternalInterface.call("console.group");
+				ExternalInterface.call("console.log", mixedVar);
+				ExternalInterface.call("console.groupEnd");
+			}
 		}
 		
 		public function externalCallback(eventName:String, eventFunction:Function):void {
 			console("creating external callback: " + eventName);
 			ExternalInterface.addCallback(eventName, eventFunction);
 		}
-
-        public function mbp_initVASTRESPONSE():void {
-            /*console("RESPONSE");*/
-            /*console(response);*/
-    
-            try {
-                var adSWF:String = _app.model.adContainer.findVPAIDSWF(decodeURIComponent(_vastResponse));
-                /*console("AD SWF");*/
-                /*console(adSWF);*/
-                /*console(adSWF.indexOf(".swf"));*/
-        
-                if (adSWF.indexOf(".swf") != -1) {
-                    console("PROPER SWF")
-                    /*_app.model.adContainer.src(adSWF);*/
-                    _app.model.adContainer.setSrcTest(adSWF);
-                    console("testing...");
-                    console(_app.model.adContainer.getSrc());
-                    _app.model.adContainer.loadAdAsset();
-                }
-                else {
-                    console("NO PROPER SWF FOUND!");
-                    console(_app.model.adContainer.getSrc());
-
-                }
-
-            }
-            catch (e:Error) {
-                console("ERROR");
-                console(e);
-            }
-        }
-
-        public function mbp_startAd():void {
-            console("VPAIDSWF: startAd");
-            _app.model.adContainer.startAd();
-        }
+		
+		public function mbp_initVPAID(adURL:String):void {
+			ExternalInterface.call("console.log", "STARTING");
+			console("initiating VPAID with ad URL: " + adURL);
+			/*console(_app.model.adContainer.testFunction());*/
+			/*console("current SRC: " + _app.model.adContainer.src());*/
+			
+			try {
+				_app.model.adContainer.loadVPAIDXML(adURL, 
+					function(event:Event):void {
+						console("ONCOMPLETE");
+						var response:String = event.target.data;
+						/*console("RESPONSE");*/
+						/*console(response);*/
+				
+						var adSWF:String = _app.model.adContainer.findVPAIDSWF(response);
+						/*console("AD SWF");*/
+						/*console(adSWF);*/
+						/*console(adSWF.indexOf(".swf"));*/
+				
+						if (adSWF.indexOf(".swf") != -1) {
+							console("PROPER SWF")
+							/*_app.model.adContainer.src(adSWF);*/
+							_app.model.adContainer.setSrcTest(adSWF);
+							console("testing...");
+							console(_app.model.adContainer.getSrc());
+							_app.model.adContainer.loadAdAsset();
+						}
+						else {
+							console("NO PROPER SWF FOUND!");
+							_app.model.adContainer.abortAd();
+						}
+					}
+				);
+			}
+			catch (e:Error) {
+				console("VPAID ERROR 2");
+				console(e);
+				_app.model.adContainer.abortAd();
+			}
+		}
+		
+		public function mbp_initVPAIDSWF(aVPAIDSWF:String):void {
+			var adSWF:String = aVPAIDSWF;
+			console("initiating VPAID with ad SWF: " + adSWF);
+			try {
+				console("PROPER SWF");
+				_app.model.adContainer.setSrcTest(adSWF);
+				console("testing...");
+				console(_app.model.adContainer.getSrc());
+				_app.model.adContainer.loadAdAsset();
+			}
+			catch (e:Error) {
+				console("VPAID Error");
+				console(e);
+				_app.model.adContainer.abortAd();
+			}
+		}
         
         private function init():void{
 			
@@ -116,12 +136,13 @@ package{
             _ctxMenu.hideBuiltInItems();
             _ctxMenu.customItems.push(_ctxVersion, _ctxAbout);
             this.contextMenu = _ctxMenu;
-
-            _app.model.adContainer.setDebug(_debug);
+			
+			// Set debug for adContainer
+			_app.model.adContainer.setDebug(_debug);
 			
 			// VPAID
-            externalCallback("mbp_startAd", mbp_startAd);
-            externalCallback("mbp_initVASTRESPONSE", mbp_initVASTRESPONSE);
+			externalCallback("mbp_initVPAID", mbp_initVPAID);
+			externalCallback("mbp_initVPAIDSWF", mbp_initVPAIDSWF);
         }
         
         private function registerExternalMethods():void{
@@ -206,10 +227,11 @@ package{
             stage.scaleMode = StageScaleMode.NO_SCALE;
             stage.align = StageAlign.TOP_LEFT;
             _stageSizeTimer.start();
-
-            _debug = loaderInfo.parameters.debug;
-
-            _vastResponse = loaderInfo.parameters.vast;
+			
+			ExternalInterface.call("console.log", "LOADING");
+			
+			// Set debug boolean
+			_debug 			= (loaderInfo.parameters.debug == "true");
         }
         
         private function onStageSizeTimerTick(e:TimerEvent):void{
@@ -372,7 +394,6 @@ package{
                     _app.model.seekByPercent(Number(pValue));
                     break;
                 case "muted":
-                    _app.model.adContainer.alwaysMuted(pValue);
                     _app.model.muted = _app.model.humanToBoolean(pValue);
                     break;
                 case "volume":

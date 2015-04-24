@@ -16,10 +16,10 @@ vjs.Vpaidflash = vjs.MediaTechController.extend({
 	/** @constructor */
 	init: function(player, options, ready){
 		
-		console.log("flash init!");
-	  	console.log("player", player);
-	  	console.log("options", options);
-	  	console.log("ready", ready);
+		console.log("[js] flash init!");
+	  	console.log("[js] player", player);
+	  	console.log("[js] options", options);
+	  	console.log("[js] ready", ready);
 	  
     	vjs.MediaTechController.call(this, player, options, ready);
 
@@ -43,15 +43,15 @@ vjs.Vpaidflash = vjs.MediaTechController.extend({
         	flashVars = vjs.obj.merge({
 
           	  // SWF Callback Functions
-          	  'readyFunction': 'vjs.Vpaidflash.onReady',
-          	  'eventProxyFunction': 'vjs.Vpaidflash.onEvent',
-          	  'errorEventProxyFunction': 'vjs.Vpaidflash.onError',
+          	  'readyFunction'				: 'vjs.Vpaidflash.onReady',
+          	  'eventProxyFunction'			: 'vjs.Vpaidflash.onEvent',
+          	  'errorEventProxyFunction'		: 'vjs.Vpaidflash.onError',
 
           	  // Player Settings
-          	  'autoplay': playerOptions.autoplay,
-          	  'preload': playerOptions.preload,
-          	  'loop': playerOptions.loop,
-          	  'muted': playerOptions.muted
+          	  'autoplay'	: playerOptions.autoplay,
+          	  'preload'		: playerOptions.preload,
+          	  'loop'		: playerOptions.loop,
+          	  'muted'		: playerOptions.muted
         	}, options['flashVars']),
 
         	// Merge default parames with ones passed in
@@ -348,31 +348,36 @@ vjs.Vpaidflash['checkReady'] = function(tech){
 // Trigger events from the swf on the player
 vjs.Vpaidflash['onEvent'] = function(swfID, eventName){
 	console.log("ON EVENT", swfID, eventName);
-  var player = vjs.el(swfID)['player'];
-  player.trigger(eventName);
-  
-  if (eventName == "ended") {
-	  console.log("disposing");
-	  console.log(player);
-	  player.el_.removeChild(player.el_.firstChild);
-	  console.log(this.el_.firstChild);
-	  
-  }
+	var player = vjs.el(swfID)['player'];
+	player.trigger(eventName);
+
+	if (eventName == "ended" || eventName == "AdError") {
+		console.log("disposing!");
+		// console.log(player);
+// 		player.el_.removeChild(player.el_.firstChild);
+// 		console.log(this.el_.firstChild);
+		
+		window.vjsPlayer = player;
+		console.log(window.vjsPlayer.currentSrc());
+		
+		player.play();
+	}
 };
 
 // Log errors from the swf
 vjs.Vpaidflash['onError'] = function(swfID, err){
 	console.log("ON ERROR", swfID, err);
-  var player = vjs.el(swfID)['player'];
-  var msg = 'FLASH: '+err;
+	var player = vjs.el(swfID)['player'];
+	var msg = 'FLASH: '+err;
 
-  if (err == 'srcnotfound') {
-    player.error({ code: 4, message: msg });
+	if (err == 'srcnotfound') {
+		player.error({ code: 4, message: msg });
 
-  // errors we haven't categorized into the media errors
-  } else {
-    player.error(msg);
-  }
+		// errors we haven't categorized into the media errors
+	} 
+	else {
+		player.error(msg);
+	}
 };
 
 // Flash Version Check
@@ -396,75 +401,74 @@ vjs.Vpaidflash.version = function(){
 
 // Flash embedding method. Only used in non-iframe mode
 vjs.Vpaidflash.embed = function(swf, placeHolder, flashVars, params, attributes){
-	console.log("EMBED TIME!");
-  var code = vjs.Vpaidflash.getEmbedCode(swf, flashVars, params, attributes),
+	
+	// console.log("EMBED TIME!");
+	
+	var code = vjs.Vpaidflash.getEmbedCode(swf, flashVars, params, attributes),
 
-      // Get element by embedding code and retrieving created element
-      obj = vjs.createEl('div', { innerHTML: code }).childNodes[0],
+		// Get element by embedding code and retrieving created element
+		obj = vjs.createEl('div', { innerHTML: code }).childNodes[0],
 
-      par = placeHolder.parentNode
-  ;
-  
-  console.log("code:", code);
+		par = placeHolder.parentNode;
 
-  placeHolder.parentNode.replaceChild(obj, placeHolder);
+	// console.log("code:", code);
+
+	placeHolder.parentNode.replaceChild(obj, placeHolder);
 
 	// IE6 seems to have an issue where it won't initialize the swf object after injecting it.
 	// This is a dumb fix
 	var newObj = par.childNodes[0];
 	setTimeout(function(){
-	console.log("new object should be ready");
-	newObj.style.display = 'block';
+		// console.log("new object should be ready");
+		newObj.style.display = 'block';
 	}, 1000);
 
-
 	return obj;
-
 };
 
 vjs.Vpaidflash.getEmbedCode = function(swf, flashVars, params, attributes){
 
-	console.log("get embed code");
-	console.log("swf", swf, "\nflashVars", flashVars, "\nparams", params, "\nattributes", attributes);
-  var objTag = '<object type="application/x-shockwave-flash" ',
-      flashVarsString = '',
-      paramsString = '',
-      attrsString = '';
+	// console.log("get embed code");
+	// console.log("swf", swf, "\nflashVars", flashVars, "\nparams", params, "\nattributes", attributes);
+	
+	var objTag 				= '<object type="application/x-shockwave-flash" ',
+		flashVarsString 	= '',
+		paramsString 		= '',
+		attrsString 		= '';
 
-  // Convert flash vars to string
-  if (flashVars) {
-    vjs.obj.each(flashVars, function(key, val){
-      flashVarsString += (key + '=' + val + '&amp;');
-    });
-  }
+	// Convert flash vars to string
+	if (flashVars) {
+		vjs.obj.each(flashVars, function(key, val) {
+			flashVarsString += (key + '=' + val + '&amp;');
+		});
+	}
 
-  // Add swf, flashVars, and other default params
-  params = vjs.obj.merge({
-    'movie': swf,
-    'flashvars': flashVarsString,
-    'allowScriptAccess': 'always', // Required to talk to swf
-    'allowNetworking': 'all' // All should be default, but having security issues.
-  }, params);
+	// Add swf, flashVars, and other default params
+	params = vjs.obj.merge({
+		'movie'				: swf,
+		'flashvars'			: flashVarsString,
+		'allowScriptAccess'	: 'always', // Required to talk to swf
+		'allowNetworking'	: 'all' // All should be default, but having security issues.
+	}, params);
 
-  // Create param tags string
-  vjs.obj.each(params, function(key, val){
-    paramsString += '<param name="'+key+'" value="'+val+'" />';
-  });
+	// Create param tags string
+	vjs.obj.each(params, function(key, val) {
+		paramsString += '<param name="'+key+'" value="'+val+'" />';
+	});
 
-  attributes = vjs.obj.merge({
-    // Add swf to attributes (need both for IE and Others to work)
-    'data': swf,
+	attributes = vjs.obj.merge({
+		// Add swf to attributes (need both for IE and Others to work)
+		'data': swf,
 
-    // Default to 100% width/height
-    'width': '100%',
-    'height': '100%'
+		// Default to 100% width/height
+		'width': '100%',
+		'height': '100%'
+	}, attributes);
 
-  }, attributes);
+	// Create Attributes string
+	vjs.obj.each(attributes, function(key, val) {
+		attrsString += (key + '="' + val + '" ');
+	});
 
-  // Create Attributes string
-  vjs.obj.each(attributes, function(key, val){
-    attrsString += (key + '="' + val + '" ');
-  });
-
-  return objTag + attrsString + '>' + paramsString + '</object>';
+	return objTag + attrsString + '>' + paramsString + '</object>';
 };
