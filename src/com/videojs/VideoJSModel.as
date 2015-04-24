@@ -44,6 +44,7 @@ package com.videojs{
         // ad support
         private var _adContainer:AdContainer;
         private var _adParameters:String = "";
+        private var _environmentVars:String = "";
 
         private static var _instance:VideoJSModel;
 
@@ -208,6 +209,12 @@ package com.videojs{
         }
         public function set adParameters(pValue:String):void {
             _adParameters = pValue;
+        }
+        public function get environmentVars():String{
+            return _environmentVars;
+        }
+        public function set environmentVars(pValue:String):void {
+            _environmentVars = pValue;
         }
         public function get bitrate():Number{
             return _bitrate;
